@@ -1,0 +1,1354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Spaghettification — Descent into a Black Hole</title>
+  <meta name="description" content="Interactive 3D visualization of tidal forces and spaghettification near a stellar-mass black hole. Physics-accurate distance mapping." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #05060c;
+      --panel: rgba(10, 14, 28, 0.72);
+      --panel-border: rgba(120, 160, 255, 0.14);
+      --text: #e8eefc;
+      --muted: #8b97b8;
+      --accent: #6eb6ff;
+      --warn: #ffb347;
+      --danger: #ff5c7a;
+      --ok: #5dffa8;
+      --violet: #a78bfa;
+      --glow: 0 0 40px rgba(110, 182, 255, 0.25);
+      --radius: 18px;
+      --mono: "IBM Plex Mono", ui-monospace, monospace;
+      --sans: "Outfit", system-ui, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    #canvas-host {
+      position: fixed; inset: 0;
+      z-index: 0;
+    }
+    canvas { display: block; width: 100%; height: 100%; }
+
+    .vignette {
+      pointer-events: none;
+      position: fixed; inset: 0; z-index: 1;
+      background:
+        radial-gradient(ellipse 80% 70% at 50% 45%, transparent 30%, rgba(0,0,0,0.55) 100%),
+        linear-gradient(180deg, rgba(5,6,12,0.55) 0%, transparent 18%, transparent 78%, rgba(5,6,12,0.75) 100%);
+    }
+
+    /* ── Top bar ── */
+    .topbar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: 16px; padding: 22px 28px;
+      pointer-events: none;
+    }
+    .brand {
+      pointer-events: auto;
+      max-width: min(520px, 52vw);
+    }
+    .brand h1 {
+      font-size: clamp(1.15rem, 2.2vw, 1.55rem);
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      background: linear-gradient(120deg, #fff 0%, #9ec8ff 55%, #c4b5fd 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .brand p {
+      margin-top: 6px;
+      font-size: 0.82rem;
+      color: var(--muted);
+      line-height: 1.45;
+      font-weight: 400;
+    }
+    .brand .cite {
+      margin-top: 8px;
+      font-family: var(--mono);
+      font-size: 0.68rem;
+      color: rgba(139, 151, 184, 0.75);
+    }
+    .brand a {
+      color: var(--accent);
+      text-decoration: none;
+      border-bottom: 1px solid rgba(110, 182, 255, 0.35);
+    }
+    .brand a:hover { border-bottom-color: var(--accent); }
+
+    .mass-pills {
+      pointer-events: auto;
+      display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end;
+    }
+    .pill {
+      appearance: none; border: 1px solid var(--panel-border);
+      background: var(--panel);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      color: var(--muted);
+      font-family: var(--sans);
+      font-size: 0.78rem;
+      font-weight: 500;
+      padding: 10px 14px;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .pill:hover { color: var(--text); border-color: rgba(110,182,255,0.35); }
+    .pill.active {
+      color: #041018;
+      background: linear-gradient(135deg, #8ec5ff, #b8a4ff);
+      border-color: transparent;
+      box-shadow: var(--glow);
+    }
+
+    /* ── Stage badge ── */
+    .stage-badge {
+      position: fixed;
+      top: 50%;
+      left: 28px;
+      transform: translateY(-50%);
+      z-index: 20;
+      pointer-events: none;
+      max-width: 220px;
+    }
+    .stage-badge .label {
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .stage-badge .name {
+      font-size: 1.35rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+      transition: color 0.4s ease;
+    }
+    .stage-badge .desc {
+      margin-top: 10px;
+      font-size: 0.8rem;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    .stage-steps {
+      margin-top: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .stage-step {
+      display: flex; align-items: center; gap: 10px;
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      color: rgba(139,151,184,0.45);
+      transition: color 0.3s ease;
+    }
+    .stage-step .dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: rgba(139,151,184,0.3);
+      transition: all 0.3s ease;
+    }
+    .stage-step.on { color: var(--text); }
+    .stage-step.on .dot {
+      background: var(--accent);
+      box-shadow: 0 0 10px rgba(110,182,255,0.8);
+    }
+    .stage-step.passed .dot { background: rgba(93,255,168,0.5); }
+
+    /* ── Telemetry ── */
+    .telemetry {
+      position: fixed;
+      top: 50%;
+      right: 28px;
+      transform: translateY(-50%);
+      z-index: 20;
+      width: min(280px, 30vw);
+      pointer-events: none;
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-radius: var(--radius);
+      padding: 18px 18px 16px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.45);
+    }
+    .telemetry h2 {
+      font-family: var(--mono);
+      font-size: 0.62rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+    .metric {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .metric:last-child { border-bottom: none; }
+    .metric .k {
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+    .metric .v {
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: var(--text);
+      text-align: right;
+      white-space: nowrap;
+    }
+    .metric .v.warn { color: var(--warn); }
+    .metric .v.danger { color: var(--danger); }
+    .metric .v.ok { color: var(--ok); }
+    .metric .v.accent { color: var(--accent); }
+
+    .formula {
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      font-family: var(--mono);
+      font-size: 0.62rem;
+      color: rgba(139,151,184,0.7);
+      line-height: 1.55;
+    }
+    .formula strong { color: var(--violet); font-weight: 500; }
+
+    /* ── Bottom control ── */
+    .controls {
+      position: fixed;
+      left: 50%;
+      bottom: 28px;
+      transform: translateX(-50%);
+      z-index: 20;
+      width: min(920px, calc(100vw - 40px));
+      pointer-events: auto;
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      backdrop-filter: blur(22px);
+      -webkit-backdrop-filter: blur(22px);
+      border-radius: 22px;
+      padding: 18px 22px 16px;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04);
+    }
+
+    .controls-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .dist-label {
+      font-family: var(--mono);
+      font-size: 0.68rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .dist-value {
+      font-family: var(--mono);
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .dist-value span {
+      color: var(--accent);
+    }
+
+    .btn-row { display: flex; gap: 8px; }
+    .btn {
+      appearance: none;
+      border: 1px solid var(--panel-border);
+      background: rgba(255,255,255,0.04);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 0.78rem;
+      font-weight: 500;
+      padding: 8px 14px;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: all 0.18s ease;
+    }
+    .btn:hover {
+      background: rgba(110,182,255,0.12);
+      border-color: rgba(110,182,255,0.35);
+    }
+    .btn.active {
+      background: linear-gradient(135deg, rgba(110,182,255,0.25), rgba(167,139,250,0.2));
+      border-color: rgba(110,182,255,0.45);
+    }
+
+    .slider-wrap { position: relative; padding: 8px 0 4px; }
+    .slider-track-bg {
+      position: absolute;
+      left: 0; right: 0; top: 50%;
+      height: 6px;
+      transform: translateY(-50%);
+      border-radius: 999px;
+      background: linear-gradient(
+        90deg,
+        rgba(93,255,168,0.35) 0%,
+        rgba(110,182,255,0.45) 35%,
+        rgba(255,179,71,0.5) 62%,
+        rgba(255,92,122,0.65) 82%,
+        rgba(167,139,250,0.75) 100%
+      );
+      opacity: 0.55;
+      pointer-events: none;
+    }
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 28px;
+      background: transparent;
+      cursor: pointer;
+      position: relative;
+      z-index: 2;
+    }
+    input[type="range"]::-webkit-slider-runnable-track {
+      height: 6px;
+      background: transparent;
+      border-radius: 999px;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 22px; height: 22px;
+      margin-top: -8px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #fff, #9ec8ff 55%, #6eb6ff);
+      border: 2px solid rgba(255,255,255,0.9);
+      box-shadow: 0 0 0 4px rgba(110,182,255,0.2), 0 4px 16px rgba(0,0,0,0.5);
+      transition: transform 0.12s ease, box-shadow 0.12s ease;
+    }
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.08);
+      box-shadow: 0 0 0 6px rgba(110,182,255,0.28), 0 6px 20px rgba(0,0,0,0.55);
+    }
+    input[type="range"]::-moz-range-track {
+      height: 6px;
+      background: transparent;
+      border-radius: 999px;
+    }
+    input[type="range"]::-moz-range-thumb {
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #fff, #9ec8ff 55%, #6eb6ff);
+      border: 2px solid rgba(255,255,255,0.9);
+      box-shadow: 0 0 0 4px rgba(110,182,255,0.2);
+    }
+
+    .ticks {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 6px;
+      font-family: var(--mono);
+      font-size: 0.6rem;
+      color: rgba(139,151,184,0.55);
+    }
+    .hint {
+      margin-top: 10px;
+      text-align: center;
+      font-size: 0.72rem;
+      color: rgba(139,151,184,0.65);
+    }
+    .hint kbd {
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.04);
+    }
+
+    /* Horizon marker line on slider context */
+    .horizon-note {
+      display: none;
+      margin-top: 8px;
+      text-align: center;
+      font-family: var(--mono);
+      font-size: 0.68rem;
+      color: var(--violet);
+    }
+    .horizon-note.show { display: block; }
+
+    /* Loading */
+    #loader {
+      position: fixed; inset: 0; z-index: 100;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: #05060c;
+      transition: opacity 0.6s ease, visibility 0.6s ease;
+    }
+    #loader.hide { opacity: 0; visibility: hidden; }
+    #loader .orb {
+      width: 56px; height: 56px; border-radius: 50%;
+      background: radial-gradient(circle at 50% 50%, #000 38%, transparent 40%),
+                  conic-gradient(from 0deg, #6eb6ff, #a78bfa, #ff5c7a, #6eb6ff);
+      animation: spin 1.4s linear infinite;
+      box-shadow: 0 0 40px rgba(110,182,255,0.3);
+      margin-bottom: 20px;
+    }
+    #loader p {
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Mobile */
+    @media (max-width: 900px) {
+      .stage-badge { display: none; }
+      .telemetry {
+        top: auto; bottom: 148px; right: 12px; left: 12px;
+        transform: none; width: auto;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0 16px;
+        padding: 12px 14px;
+      }
+      .telemetry h2 { grid-column: 1 / -1; margin-bottom: 6px; }
+      .formula { grid-column: 1 / -1; }
+      .metric { padding: 5px 0; }
+      .topbar { padding: 14px 16px; flex-direction: column; align-items: stretch; }
+      .brand { max-width: 100%; }
+      .mass-pills { justify-content: flex-start; }
+      .controls { bottom: 12px; width: calc(100vw - 24px); padding: 14px 14px 12px; border-radius: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="loader">
+    <div class="orb"></div>
+    <p>Warping spacetime…</p>
+  </div>
+
+  <div id="canvas-host"></div>
+  <div class="vignette"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <h1>Spaghettification</h1>
+      <p>As you fall toward a black hole, the gravity difference between your feet and head grows as <strong style="color:var(--accent);font-weight:500">1/r³</strong> — until tidal forces stretch, snap, and extrude you like toothpaste through a tube.</p>
+      <div class="cite">Inspired by Neil deGrasse Tyson · <a href="https://www.youtube.com/watch?v=a9W5atyoYT0" target="_blank" rel="noopener">DOAC clip</a> · Newtonian tidal model</div>
+    </div>
+    <div class="mass-pills" id="massPills" role="group" aria-label="Black hole mass">
+      <button class="pill active" data-mass="10" type="button">10 M☉ stellar</button>
+      <button class="pill" data-mass="1000" type="button">10³ M☉ intermediate</button>
+      <button class="pill" data-mass="4e6" type="button">4×10⁶ M☉ Sgr A*</button>
+    </div>
+  </header>
+
+  <aside class="stage-badge" aria-live="polite">
+    <div class="label">Descent stage</div>
+    <div class="name" id="stageName">Safe orbit</div>
+    <div class="desc" id="stageDesc">Tidal forces are negligible. You look fine.</div>
+    <div class="stage-steps" id="stageSteps"></div>
+  </aside>
+
+  <aside class="telemetry" aria-label="Physics telemetry">
+    <h2>Live physics</h2>
+    <div class="metric"><span class="k">Distance r</span><span class="v accent" id="m-r">—</span></div>
+    <div class="metric"><span class="k">Event horizon Rₛ</span><span class="v" id="m-rs">—</span></div>
+    <div class="metric"><span class="k">r / Rₛ</span><span class="v" id="m-ratio">—</span></div>
+    <div class="metric"><span class="k">g at feet</span><span class="v" id="m-gfeet">—</span></div>
+    <div class="metric"><span class="k">g at head</span><span class="v" id="m-ghead">—</span></div>
+    <div class="metric"><span class="k">Tidal Δg</span><span class="v" id="m-dg">—</span></div>
+    <div class="metric"><span class="k">Stretch load</span><span class="v" id="m-force">—</span></div>
+    <div class="metric"><span class="k">Body stretch</span><span class="v" id="m-stretch">—</span></div>
+    <div class="formula">
+      <strong>Δg ≈ 2GM L / r³</strong><br />
+      L = 1.75 m body · feet toward BH<br />
+      Structural snap ≈ 50–100 kN scale
+    </div>
+  </aside>
+
+  <footer class="controls">
+    <div class="controls-top">
+      <div>
+        <div class="dist-label">Distance from singularity</div>
+        <div class="dist-value"><span id="distReadout">—</span></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn" id="btnPlay" type="button">▶ Auto descent</button>
+        <button class="btn" id="btnReset" type="button">Reset far</button>
+      </div>
+    </div>
+    <div class="slider-wrap">
+      <div class="slider-track-bg"></div>
+      <input type="range" id="distSlider" min="0" max="1000" value="0" step="1" aria-label="Distance to black hole" />
+    </div>
+    <div class="ticks">
+      <span>Far (safe)</span>
+      <span>Stretch</span>
+      <span>Snap</span>
+      <span>Bifurcate</span>
+      <span>Horizon / tube</span>
+    </div>
+    <div class="horizon-note" id="horizonNote">⚠ Inside event horizon — light cannot escape. Equations still show tidal stretch.</div>
+    <div class="hint">Drag slider left → right to fall in · <kbd>←</kbd> <kbd>→</kbd> fine step · <kbd>Space</kbd> autoplay</div>
+  </footer>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+// ═══════════════════════════════════════════════════════════
+// Constants & physics
+// ═══════════════════════════════════════════════════════════
+const G = 6.67430e-11;       // m³ kg⁻¹ s⁻²
+const C = 2.99792458e8;      // m/s
+const M_SUN = 1.98847e30;    // kg
+const L_BODY = 1.75;         // m head-to-toe
+const M_BODY = 70;           // kg
+const G_EARTH = 9.80665;
+
+// Visual layout (scene units ≠ meters; meters drive math)
+const BH_VISUAL_R = 2.4;
+const HUMAN_BASE_SCALE = 0.55;
+const HUMAN_X = -7.2;
+
+const STAGES = [
+  { id: 'safe',      name: 'Safe orbit',           color: '#5dffa8', desc: 'Tidal Δg is tiny — same order as standing on Earth. Body integrity: full.' },
+  { id: 'notice',    name: 'Noticeable stretch',   color: '#6eb6ff', desc: 'Feet feel heavier than head. Mild longitudinal tension. Still conscious and intact.' },
+  { id: 'severe',    name: 'Unrelenting stretch',  color: '#ffb347', desc: 'Tidal forces grow as 1/r³. Spine and soft tissue under continuous load. Pain replaces the “nice stretch.”' },
+  { id: 'snap',      name: 'Structural snap',      color: '#ff7a59', desc: 'Body fails near the base of the spine — NDT’s first bifurcation. One becomes two.' },
+  { id: 'bifurcate', name: '1 → 2 → 4 → 8',        color: '#ff5c7a', desc: 'Each fragment stretches and snaps again. Cascading tidal failure toward the singularity.' },
+  { id: 'tube',      name: 'Toothpaste tube',      color: '#a78bfa', desc: 'Stretched head-to-toe and squeezed laterally — extruded through narrowing spacetime.' },
+  { id: 'horizon',   name: 'Event horizon',        color: '#c4b5fd', desc: 'Escape velocity > c. Outside: still classically calculable tides. Inside: GR takes over fully.' },
+];
+
+// ═══════════════════════════════════════════════════════════
+// State
+// ═══════════════════════════════════════════════════════════
+let blackHoleMassSolar = 10;
+let sliderT = 0; // 0 far → 1 near
+let autoplay = false;
+let clock = new THREE.Clock();
+
+// DOM
+const $ = (id) => document.getElementById(id);
+const slider = $('distSlider');
+const stageStepsEl = $('stageSteps');
+
+STAGES.forEach((s, i) => {
+  const el = document.createElement('div');
+  el.className = 'stage-step';
+  el.innerHTML = `<span class="dot"></span><span>${s.name}</span>`;
+  el.dataset.i = i;
+  stageStepsEl.appendChild(el);
+});
+
+// ═══════════════════════════════════════════════════════════
+// Distance mapping (log space for r⁻³ dynamics)
+// ═══════════════════════════════════════════════════════════
+function schwarzschildRadius(Msolar) {
+  const M = Msolar * M_SUN;
+  return (2 * G * M) / (C * C); // meters
+}
+
+function distanceRange(Msolar) {
+  const Rs = schwarzschildRadius(Msolar);
+  // Log span chosen so "safe" is truly mild for stellar holes, while still
+  // reaching past the horizon. For 10 M☉: ~80,000 km → ~0.4 Rs.
+  const rFar = Math.max(Rs * 2700, 8e7); // far: Δg << 1 g for 10 M☉
+  const rNear = Rs * 0.38;               // allow a beat past the horizon
+  return { rFar, rNear, Rs };
+}
+
+function sliderToRadius(t, Msolar) {
+  const { rFar, rNear } = distanceRange(Msolar);
+  // logarithmic interpolation
+  const logFar = Math.log(rFar);
+  const logNear = Math.log(rNear);
+  return Math.exp(logFar + t * (logNear - logFar));
+}
+
+function physicsAt(r, Msolar) {
+  const M = Msolar * M_SUN;
+  const Rs = schwarzschildRadius(Msolar);
+  const rFeet = Math.max(r, 1);
+  const rHead = rFeet + L_BODY;
+
+  // Newtonian g (magnitude)
+  const gFeet = (G * M) / (rFeet * rFeet);
+  const gHead = (G * M) / (rHead * rHead);
+  // Exact difference (not approx) — feet closer → larger g
+  const deltaG = gFeet - gHead;
+  // Standard textbook approx
+  const deltaGApprox = (2 * G * M * L_BODY) / Math.pow(rFeet, 3);
+  // Effective stretch force scale (order of magnitude)
+  const F = M_BODY * deltaG;
+
+  return { r: rFeet, Rs, gFeet, gHead, deltaG, deltaGApprox, F, ratio: rFeet / Rs };
+}
+
+// Visual stretch model driven by Δg and force thresholds
+function deformationFromPhysics(p) {
+  const { deltaG, F, ratio } = p;
+
+  // Order-of-magnitude human structural limits (pedagogical, not medical)
+  const F_NOTICE = 200;      // N — mild continuous tension
+  const F_SEVERE = 5e3;      // N — severe discomfort
+  const F_SNAP = 4e4;        // ~40 kN — first structural failure (spine)
+  const F_MULTI = 1.5e5;     // multi-fragment cascade
+  const F_TUBE = 8e5;        // extreme extrusion
+
+  const sm = (a, b, x) => {
+    const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+    return t * t * (3 - 2 * t);
+  };
+
+  const notice = sm(F_NOTICE * 0.25, F_NOTICE * 4, F);
+  const severe = sm(F_SEVERE * 0.4, F_SEVERE * 2.2, F);
+  const snapT = sm(F_SNAP * 0.55, F_SNAP * 1.5, F);
+  const multiT = sm(F_MULTI * 0.45, F_MULTI * 2.2, F);
+  const tubeT = sm(F_TUBE * 0.35, F_TUBE * 3.5, F);
+
+  // Visual length: anchored to log10(Δg / g⊕), exaggerated for readability
+  const stretchBase = 1 + Math.log10(1 + deltaG / G_EARTH) * 0.72;
+  const stretch = Math.min(22, stretchBase * (1 + severe * 0.9 + snapT * 1.35 + tubeT * 2.8));
+
+  // Lateral compression (toothpaste through a tube)
+  const squash = Math.max(0.035, 1 - tubeT * 0.94 - multiT * 0.18 - severe * 0.08);
+
+  let bifurcate = 0;
+  if (snapT > 0.5) bifurcate = 1;
+  if (multiT > 0.3) bifurcate = 2;
+  if (multiT > 0.65) bifurcate = 3;
+  if (tubeT > 0.5) bifurcate = 4;
+
+  let stage = 0;
+  if (notice > 0.35) stage = 1;
+  if (severe > 0.4) stage = 2;
+  if (snapT > 0.5) stage = 3;
+  if (multiT > 0.35) stage = 4;
+  if (tubeT > 0.4) stage = 5;
+  if (ratio < 1.12) stage = 6;
+
+  return { stretch, squash, bifurcate, stage, snapT, multiT, tubeT, notice, severe };
+}
+
+// ═══════════════════════════════════════════════════════════
+// Three.js scene
+// ═══════════════════════════════════════════════════════════
+const host = $('canvas-host');
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+host.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x05060c, 0.012);
+
+const camera = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 0.1, 500);
+camera.position.set(0, 1.8, 14);
+camera.lookAt(0, 0, 0);
+
+// Lights
+scene.add(new THREE.AmbientLight(0x334466, 0.55));
+const key = new THREE.DirectionalLight(0xaaccff, 1.1);
+key.position.set(-8, 10, 12);
+scene.add(key);
+const rim = new THREE.PointLight(0xff7744, 2.2, 40);
+rim.position.set(4, 1, 2);
+scene.add(rim);
+const cool = new THREE.PointLight(0x6688ff, 1.4, 50);
+cool.position.set(-10, 3, -4);
+scene.add(cool);
+
+// ── Stars ──
+function makeStars(count, radius, size, color) {
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    const r = radius * (0.55 + Math.random() * 0.45);
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    pos[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+    pos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+    pos[i * 3 + 2] = r * Math.cos(phi);
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const mat = new THREE.PointsMaterial({
+    color, size, sizeAttenuation: true, transparent: true, opacity: 0.9, depth: THREE.AdditiveBlending, depthWrite: false,
+  });
+  return new THREE.Points(geo, mat);
+}
+scene.add(makeStars(3500, 120, 0.08, 0xc8d8ff));
+scene.add(makeStars(900, 90, 0.16, 0xffffff));
+
+// ── Black hole group ──
+const bhGroup = new THREE.Group();
+bhGroup.position.set(5.5, 0, 0);
+scene.add(bhGroup);
+
+// Event horizon (true black)
+const horizonMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+const horizon = new THREE.Mesh(new THREE.SphereGeometry(BH_VISUAL_R, 64, 64), horizonMat);
+bhGroup.add(horizon);
+
+// Photon ring
+const ringGeo = new THREE.TorusGeometry(BH_VISUAL_R * 1.08, 0.04, 16, 128);
+const ringMat = new THREE.MeshBasicMaterial({
+  color: 0xffe0a0,
+  transparent: true,
+  opacity: 0.95,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+});
+const photonRing = new THREE.Mesh(ringGeo, ringMat);
+photonRing.rotation.x = Math.PI / 2.15;
+bhGroup.add(photonRing);
+
+// Glow shells
+function glowShell(r, color, opacity) {
+  const m = new THREE.Mesh(
+    new THREE.SphereGeometry(r, 48, 48),
+    new THREE.MeshBasicMaterial({
+      color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.BackSide,
+    })
+  );
+  bhGroup.add(m);
+  return m;
+}
+glowShell(BH_VISUAL_R * 1.15, 0xff6622, 0.12);
+glowShell(BH_VISUAL_R * 1.45, 0x4488ff, 0.06);
+glowShell(BH_VISUAL_R * 2.1, 0x2244aa, 0.035);
+
+// Accretion disk — procedural rings of particles
+const diskGroup = new THREE.Group();
+bhGroup.add(diskGroup);
+
+function makeDiskRing(inner, outer, count, baseColor) {
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(count * 3);
+  const cols = new Float32Array(count * 3);
+  const c = new THREE.Color(baseColor);
+  for (let i = 0; i < count; i++) {
+    const u = Math.random();
+    const rad = Math.sqrt(inner * inner + u * (outer * outer - inner * inner));
+    const ang = Math.random() * Math.PI * 2;
+    const y = (Math.random() - 0.5) * 0.12 * (1 - (rad - inner) / (outer - inner + 1e-6));
+    pos[i * 3] = Math.cos(ang) * rad;
+    pos[i * 3 + 1] = y;
+    pos[i * 3 + 2] = Math.sin(ang) * rad;
+    const heat = 1 - (rad - inner) / (outer - inner + 1e-6);
+    const cc = c.clone().lerp(new THREE.Color(0xfff5d0), heat * 0.65);
+    cols[i * 3] = cc.r;
+    cols[i * 3 + 1] = cc.g;
+    cols[i * 3 + 2] = cc.b;
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+  const mat = new THREE.PointsMaterial({
+    size: 0.045, vertexColors: true, transparent: true, opacity: 0.85,
+    blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true,
+  });
+  return new THREE.Points(geo, mat);
+}
+const diskInner = makeDiskRing(BH_VISUAL_R * 1.25, BH_VISUAL_R * 2.4, 6000, 0xff8844);
+const diskOuter = makeDiskRing(BH_VISUAL_R * 2.3, BH_VISUAL_R * 4.2, 5000, 0x6688ff);
+diskGroup.add(diskInner, diskOuter);
+diskGroup.rotation.x = 0.42;
+diskGroup.rotation.z = -0.08;
+
+// Disk mesh for solid look
+const diskMesh = new THREE.Mesh(
+  new THREE.RingGeometry(BH_VISUAL_R * 1.2, BH_VISUAL_R * 3.8, 96),
+  new THREE.MeshBasicMaterial({
+    color: 0xff6a30,
+    transparent: true,
+    opacity: 0.18,
+    side: THREE.DoubleSide,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  })
+);
+diskMesh.rotation.x = -Math.PI / 2 + 0.42;
+diskGroup.add(diskMesh);
+
+// Infall stream particles (visual flavor near BH)
+const streamCount = 400;
+const streamGeo = new THREE.BufferGeometry();
+const streamPos = new Float32Array(streamCount * 3);
+const streamPhase = new Float32Array(streamCount);
+for (let i = 0; i < streamCount; i++) {
+  streamPhase[i] = Math.random();
+  streamPos[i * 3] = 0;
+  streamPos[i * 3 + 1] = 0;
+  streamPos[i * 3 + 2] = 0;
+}
+streamGeo.setAttribute('position', new THREE.BufferAttribute(streamPos, 3));
+const streamMat = new THREE.PointsMaterial({
+  color: 0xaaccff, size: 0.05, transparent: true, opacity: 0.55,
+  blending: THREE.AdditiveBlending, depthWrite: false,
+});
+const stream = new THREE.Points(streamGeo, streamMat);
+bhGroup.add(stream);
+
+// ── Human figure (procedural, clear silhouette) ──
+const humanRoot = new THREE.Group();
+humanRoot.position.set(HUMAN_X, 0, 0);
+scene.add(humanRoot);
+
+const skinMat = new THREE.MeshStandardMaterial({
+  color: 0xe8c4a8,
+  roughness: 0.55,
+  metalness: 0.05,
+  emissive: 0x221108,
+  emissiveIntensity: 0.08,
+});
+const clothMat = new THREE.MeshStandardMaterial({
+  color: 0x3a4d6e,
+  roughness: 0.7,
+  metalness: 0.1,
+});
+const hairMat = new THREE.MeshStandardMaterial({
+  color: 0x1a1520,
+  roughness: 0.85,
+  metalness: 0.05,
+});
+const boneMat = new THREE.MeshStandardMaterial({
+  color: 0xf0e6d8,
+  roughness: 0.45,
+  metalness: 0.05,
+  transparent: true,
+  opacity: 0,
+});
+
+function capsule(r, len, mat, segs = 10) {
+  // cylinder + spheres
+  const g = new THREE.Group();
+  const cyl = new THREE.Mesh(new THREE.CylinderGeometry(r, r, Math.max(0.01, len - 2 * r), segs), mat);
+  const s1 = new THREE.Mesh(new THREE.SphereGeometry(r, segs, segs), mat);
+  const s2 = new THREE.Mesh(new THREE.SphereGeometry(r, segs, segs), mat);
+  s1.position.y = (len - 2 * r) / 2;
+  s2.position.y = -(len - 2 * r) / 2;
+  if (len > 2 * r) g.add(cyl);
+  g.add(s1, s2);
+  return g;
+}
+
+// Body parts in local human space (Y up, head +Y). Feet toward +X (black hole).
+// We'll rotate whole human so feet point at BH (to the right).
+const humanBody = new THREE.Group();
+humanRoot.add(humanBody);
+
+// Build upright human, then rotate -90° around Z so head is -X (away) feet +X (toward BH)
+const parts = {};
+
+function addPart(name, mesh, x, y, z) {
+  mesh.position.set(x, y, z);
+  mesh.userData.base = { x, y, z, sx: 1, sy: 1, sz: 1 };
+  humanBody.add(mesh);
+  parts[name] = mesh;
+  return mesh;
+}
+
+// Proportions in scene units (will be scaled)
+const U = 1.0;
+addPart('head', (() => {
+  const g = new THREE.Group();
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.22 * U, 24, 24), skinMat);
+  const hair = new THREE.Mesh(new THREE.SphereGeometry(0.23 * U, 20, 16, 0, Math.PI * 2, 0, Math.PI * 0.55), hairMat);
+  hair.position.y = 0.04;
+  // simple face marks for readability
+  const eyeM = new THREE.MeshBasicMaterial({ color: 0x1a1a22 });
+  const e1 = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 8), eyeM);
+  const e2 = e1.clone();
+  e1.position.set(0.08, 0.04, 0.18);
+  e2.position.set(-0.08, 0.04, 0.18);
+  g.add(head, hair, e1, e2);
+  return g;
+})(), 0, 1.55, 0);
+
+addPart('neck', new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, 0.12, 12), skinMat), 0, 1.36, 0);
+addPart('torso', new THREE.Mesh(new THREE.CapsuleGeometry(0.28, 0.55, 8, 16), clothMat), 0, 1.0, 0);
+addPart('pelvis', new THREE.Mesh(new THREE.CapsuleGeometry(0.24, 0.12, 6, 14), clothMat), 0, 0.58, 0);
+
+// Arms
+addPart('uArmL', new THREE.Mesh(new THREE.CapsuleGeometry(0.07, 0.28, 6, 12), skinMat), 0.38, 1.15, 0);
+addPart('uArmR', new THREE.Mesh(new THREE.CapsuleGeometry(0.07, 0.28, 6, 12), skinMat), -0.38, 1.15, 0);
+addPart('lArmL', new THREE.Mesh(new THREE.CapsuleGeometry(0.06, 0.28, 6, 12), skinMat), 0.42, 0.78, 0);
+addPart('lArmR', new THREE.Mesh(new THREE.CapsuleGeometry(0.06, 0.28, 6, 12), skinMat), -0.42, 0.78, 0);
+
+// Legs
+addPart('uLegL', new THREE.Mesh(new THREE.CapsuleGeometry(0.09, 0.38, 6, 12), clothMat), 0.12, 0.28, 0);
+addPart('uLegR', new THREE.Mesh(new THREE.CapsuleGeometry(0.09, 0.38, 6, 12), clothMat), -0.12, 0.28, 0);
+addPart('lLegL', new THREE.Mesh(new THREE.CapsuleGeometry(0.075, 0.38, 6, 12), skinMat), 0.12, -0.22, 0);
+addPart('lLegR', new THREE.Mesh(new THREE.CapsuleGeometry(0.075, 0.38, 6, 12), skinMat), -0.12, -0.22, 0);
+addPart('footL', new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.06, 0.18), clothMat), 0.12, -0.48, 0.04);
+addPart('footR', new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.06, 0.18), clothMat), -0.12, -0.48, 0.04);
+
+// Fragment groups for bifurcation (hidden clones)
+const fragmentGroup = new THREE.Group();
+humanRoot.add(fragmentGroup);
+fragmentGroup.visible = false;
+
+function cloneBodyAsFragments(level) {
+  // Clear
+  while (fragmentGroup.children.length) {
+    const c = fragmentGroup.children[0];
+    fragmentGroup.remove(c);
+    c.traverse?.((o) => {
+      if (o.geometry) o.geometry.dispose?.();
+    });
+  }
+  const n = Math.min(16, Math.pow(2, level));
+  const mats = [
+    new THREE.MeshStandardMaterial({ color: 0xe8c4a8, roughness: 0.55, metalness: 0.05, emissive: 0x441010, emissiveIntensity: 0.15 }),
+    new THREE.MeshStandardMaterial({ color: 0x3a4d6e, roughness: 0.7, metalness: 0.1, emissive: 0x220808, emissiveIntensity: 0.1 }),
+    new THREE.MeshStandardMaterial({ color: 0xc45a5a, roughness: 0.5, metalness: 0.05, emissive: 0x550000, emissiveIntensity: 0.2 }),
+  ];
+  for (let i = 0; i < n; i++) {
+    const frag = new THREE.Mesh(
+      new THREE.CapsuleGeometry(0.08 + Math.random() * 0.06, 0.25 + Math.random() * 0.4, 4, 8),
+      mats[i % mats.length]
+    );
+    frag.userData.idx = i;
+    frag.userData.n = n;
+    fragmentGroup.add(frag);
+  }
+}
+
+// Orient: feet toward BH (+X), head away (-X)
+humanBody.rotation.z = -Math.PI / 2;
+humanBody.scale.setScalar(HUMAN_BASE_SCALE);
+
+// Ground reference grid (subtle space dust under path)
+const pathGeo = new THREE.BufferGeometry();
+const pathPts = [];
+for (let i = 0; i <= 80; i++) {
+  const x = HUMAN_X + (i / 80) * (bhGroup.position.x - BH_VISUAL_R - 0.5 - HUMAN_X);
+  pathPts.push(x, -1.8, 0);
+}
+pathGeo.setFromPoints(pathPts.map((v, i, a) => i % 3 === 0 ? new THREE.Vector3(a[i], a[i+1], a[i+2]) : null).filter(Boolean));
+// simpler line
+const linePts = [];
+for (let i = 0; i <= 80; i++) {
+  const t = i / 80;
+  linePts.push(new THREE.Vector3(
+    HUMAN_X + t * (bhGroup.position.x - HUMAN_X - BH_VISUAL_R * 1.1),
+    -1.65,
+    0
+  ));
+}
+const pathLine = new THREE.Line(
+  new THREE.BufferGeometry().setFromPoints(linePts),
+  new THREE.LineDashedMaterial({ color: 0x445577, dashSize: 0.15, gapSize: 0.12, transparent: true, opacity: 0.35 })
+);
+pathLine.computeLineDistances();
+scene.add(pathLine);
+
+// Force visualization arrows (head vs feet)
+const forceGroup = new THREE.Group();
+humanRoot.add(forceGroup);
+
+function makeArrow(color) {
+  const g = new THREE.Group();
+  const shaft = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.02, 0.02, 1, 8),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.85 })
+  );
+  shaft.position.y = 0.5;
+  const head = new THREE.Mesh(
+    new THREE.ConeGeometry(0.06, 0.14, 10),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9 })
+  );
+  head.position.y = 1.07;
+  g.add(shaft, head);
+  g.scale.set(1, 0.01, 1);
+  return g;
+}
+const arrowFeet = makeArrow(0xff5c7a);
+const arrowHead = makeArrow(0x6eb6ff);
+forceGroup.add(arrowFeet, arrowHead);
+
+// Connecting “tidal tension” beam between head and feet
+const tensionGeo = new THREE.CylinderGeometry(0.012, 0.012, 1, 8);
+const tensionMat = new THREE.MeshBasicMaterial({
+  color: 0xff88aa, transparent: true, opacity: 0.0, blending: THREE.AdditiveBlending, depthWrite: false,
+});
+const tensionBeam = new THREE.Mesh(tensionGeo, tensionMat);
+forceGroup.add(tensionBeam);
+
+const feetTag = makeTextSprite('FEET · stronger g');
+feetTag.scale.set(1.8, 0.45, 1);
+const headTag = makeTextSprite('HEAD · weaker g');
+headTag.scale.set(1.8, 0.45, 1);
+forceGroup.add(feetTag, headTag);
+
+// Distance labels in 3D (sprite)
+function makeTextSprite(text) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512; canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
+  const spr = new THREE.Sprite(mat);
+  spr.scale.set(2.8, 0.7, 1);
+  spr.userData.canvas = canvas;
+  spr.userData.ctx = ctx;
+  spr.userData.tex = tex;
+  spr.userData.setText = (t) => {
+    ctx.clearRect(0, 0, 512, 128);
+    ctx.font = '600 36px Outfit, sans-serif';
+    ctx.fillStyle = 'rgba(200,220,255,0.9)';
+    ctx.textAlign = 'center';
+    ctx.fillText(t, 256, 72);
+    tex.needsUpdate = true;
+  };
+  spr.userData.setText(text);
+  return spr;
+}
+const humanLabel = makeTextSprite('YOU');
+humanLabel.position.set(0, 1.4, 0);
+humanRoot.add(humanLabel);
+
+// ── Postprocessing ──
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.55, 0.4, 0.85);
+composer.addPass(bloom);
+
+// ═══════════════════════════════════════════════════════════
+// Formatting helpers
+// ═══════════════════════════════════════════════════════════
+function fmtDist(m) {
+  if (m >= 1e9) return (m / 1e9).toFixed(2) + ' Gm';
+  if (m >= 1e6) return (m / 1e6).toFixed(2) + ' Mm';
+  if (m >= 1e3) return (m / 1e3).toFixed(2) + ' km';
+  if (m >= 1) return m.toFixed(1) + ' m';
+  return (m * 100).toFixed(1) + ' cm';
+}
+function fmtG(ms2) {
+  const gees = ms2 / G_EARTH;
+  if (gees >= 1e6) return (gees / 1e6).toFixed(2) + ' M g';
+  if (gees >= 1e3) return (gees / 1e3).toFixed(2) + ' k g';
+  if (gees >= 10) return gees.toFixed(1) + ' g';
+  if (gees >= 0.01) return gees.toFixed(3) + ' g';
+  return gees.toExponential(2) + ' g';
+}
+function fmtForce(N) {
+  if (N >= 1e9) return (N / 1e9).toFixed(2) + ' GN';
+  if (N >= 1e6) return (N / 1e6).toFixed(2) + ' MN';
+  if (N >= 1e3) return (N / 1e3).toFixed(2) + ' kN';
+  if (N >= 1) return N.toFixed(1) + ' N';
+  return N.toExponential(2) + ' N';
+}
+
+// ═══════════════════════════════════════════════════════════
+// Apply human deformation
+// ═══════════════════════════════════════════════════════════
+let lastBifurcate = -1;
+
+function applyHuman(def, p, t) {
+  const { stretch, squash, bifurcate, stage, snapT, tubeT } = def;
+
+  // Move human along path toward BH based on slider (visual)
+  const xStart = HUMAN_X;
+  const xEnd = bhGroup.position.x - BH_VISUAL_R * 1.35;
+  humanRoot.position.x = xStart + t * (xEnd - xStart);
+  humanRoot.position.y = Math.sin(t * Math.PI) * 0.15;
+
+  // Cinematic camera: ease in as you fall
+  const camTargetX = humanRoot.position.x * 0.42 + bhGroup.position.x * 0.18;
+  camera.position.x += (camTargetX * 0.3 - camera.position.x) * 0.05;
+  camera.position.y += ((1.6 + t * 0.4) - camera.position.y) * 0.04;
+  camera.position.z += ((13.5 - t * 3.2) - camera.position.z) * 0.05;
+  camera.lookAt(humanRoot.position.x * 0.45 + bhGroup.position.x * 0.28, t * 0.15, 0);
+
+  // Whole-body stretch along local X after rotation (which is world X toward BH)
+  // humanBody is rotated -90 Z, so local Y maps to world -X... 
+  // Actually rotation.z = -PI/2: local +Y → world +X (feet direction if feet are -Y originally?)
+  // Original: head at +Y, feet at -Y. After rot.z=-90°: head → -X, feet → +X. Good (feet toward BH).
+
+  const sLong = stretch;
+  const sLat = squash;
+
+  if (bifurcate >= 1 && snapT > 0.55) {
+    humanBody.visible = false;
+    fragmentGroup.visible = true;
+    if (bifurcate !== lastBifurcate) {
+      cloneBodyAsFragments(Math.min(4, bifurcate));
+      lastBifurcate = bifurcate;
+    }
+    const n = fragmentGroup.children.length;
+    const spread = 0.15 + stretch * 0.55 + tubeT * 1.2;
+    fragmentGroup.children.forEach((frag, i) => {
+      const u = n === 1 ? 0.5 : i / (n - 1);
+      // distribute along stretch axis (world X, toward BH)
+      const along = (u - 0.5) * spread * 2.8;
+      frag.position.x = along;
+      frag.position.y = Math.sin(i * 1.7 + t * 8) * 0.08 * (1 + tubeT);
+      frag.position.z = Math.cos(i * 2.1 + t * 6) * 0.05 * squash;
+      frag.scale.set(
+        sLat * (0.6 + tubeT * 0.2),
+        (0.4 + stretch * 0.35) * (1 + tubeT * 0.8),
+        sLat * (0.6 + tubeT * 0.2)
+      );
+      // align capsules along X
+      frag.rotation.z = Math.PI / 2;
+      frag.rotation.y = i * 0.3;
+    });
+  } else {
+    humanBody.visible = true;
+    fragmentGroup.visible = false;
+    lastBifurcate = -1;
+
+    // Scale whole body along stretch axis
+    humanBody.scale.set(
+      HUMAN_BASE_SCALE * sLat,
+      HUMAN_BASE_SCALE * sLong,
+      HUMAN_BASE_SCALE * sLat
+    );
+
+    // Extra limb stretch for readability
+    const limbPull = 1 + (stretch - 1) * 0.35;
+    ['uLegL', 'uLegR', 'lLegL', 'lLegR'].forEach((k) => {
+      if (!parts[k]) return;
+      parts[k].scale.y = limbPull;
+    });
+    ['uArmL', 'uArmR', 'lArmL', 'lArmR'].forEach((k) => {
+      if (!parts[k]) return;
+      parts[k].scale.y = 1 + (stretch - 1) * 0.2;
+      parts[k].scale.x = sLat;
+      parts[k].scale.z = sLat;
+    });
+    if (parts.head) {
+      parts.head.scale.set(sLat, Math.min(1.3, 1 + (stretch - 1) * 0.08), sLat);
+    }
+    if (parts.torso) {
+      parts.torso.scale.set(sLat, 1 + (stretch - 1) * 0.15, sLat);
+    }
+
+    // Tint skin as stress rises
+    const stress = Math.min(1, def.severe * 0.5 + snapT);
+    skinMat.color.setRGB(0.91 - stress * 0.25, 0.77 - stress * 0.45, 0.66 - stress * 0.4);
+    skinMat.emissiveIntensity = 0.08 + stress * 0.25;
+    clothMat.emissiveIntensity = stress * 0.12;
+  }
+
+  // Force arrows — length ∝ log g; feet (red) always longer than head (blue)
+  const gScale = (g) => Math.min(4.2, 0.12 + Math.log10(1 + g / G_EARTH) * 0.5);
+  const lenF = gScale(p.gFeet);
+  const lenH = gScale(p.gHead);
+  const halfLen = (stretch * HUMAN_BASE_SCALE * 0.95);
+  // humanBody is rotated so feet = +X, head = −X in root space
+  arrowFeet.position.set(halfLen * 0.85, 0.15, 0.42);
+  arrowHead.position.set(-halfLen * 0.85, 0.15, 0.42);
+  arrowFeet.rotation.z = -Math.PI / 2;
+  arrowHead.rotation.z = -Math.PI / 2;
+  arrowFeet.scale.set(1, lenF, 1);
+  arrowHead.scale.set(1, lenH, 1);
+
+  feetTag.position.set(halfLen * 0.85, -0.35 - lenF * 0.15, 0.55);
+  headTag.position.set(-halfLen * 0.85, 0.55 + lenH * 0.08, 0.55);
+  feetTag.userData.setText('FEET  ' + fmtG(p.gFeet));
+  headTag.userData.setText('HEAD  ' + fmtG(p.gHead));
+
+  // Tension beam along body axis
+  const beamLen = Math.max(0.2, halfLen * 1.6);
+  tensionBeam.scale.set(1, beamLen, 1);
+  tensionBeam.position.set(0, 0.1, 0.2);
+  tensionBeam.rotation.z = -Math.PI / 2;
+  tensionMat.opacity = Math.min(0.55, def.notice * 0.15 + def.severe * 0.35 + def.snapT * 0.25);
+
+  forceGroup.visible = def.notice > 0.12;
+
+  humanLabel.position.set(0, 0.95 + Math.min(1.2, stretch * 0.08), 0.55);
+  humanLabel.userData.setText(stage >= 3 ? 'FRAGMENTS' : 'YOU');
+}
+
+// ═══════════════════════════════════════════════════════════
+// UI update
+// ═══════════════════════════════════════════════════════════
+function updateUI(p, def) {
+  const stage = STAGES[def.stage];
+  $('stageName').textContent = stage.name;
+  $('stageName').style.color = stage.color;
+  $('stageDesc').textContent = stage.desc;
+
+  stageStepsEl.querySelectorAll('.stage-step').forEach((el) => {
+    const i = +el.dataset.i;
+    el.classList.toggle('on', i === def.stage);
+    el.classList.toggle('passed', i < def.stage);
+  });
+
+  $('m-r').textContent = fmtDist(p.r);
+  $('m-rs').textContent = fmtDist(p.Rs);
+  $('m-ratio').textContent = p.ratio.toFixed(2);
+  $('m-ratio').className = 'v ' + (p.ratio < 1 ? 'danger' : p.ratio < 3 ? 'warn' : 'ok');
+  $('m-gfeet').textContent = fmtG(p.gFeet);
+  $('m-ghead').textContent = fmtG(p.gHead);
+  $('m-dg').textContent = fmtG(p.deltaG);
+  $('m-dg').className = 'v ' + (def.stage >= 3 ? 'danger' : def.stage >= 2 ? 'warn' : 'accent');
+  $('m-force').textContent = fmtForce(p.F);
+  $('m-force').className = 'v ' + (p.F > 5e4 ? 'danger' : p.F > 8e3 ? 'warn' : 'ok');
+  $('m-stretch').textContent = def.stretch.toFixed(2) + '×';
+
+  $('distReadout').textContent = `${fmtDist(p.r)}  ·  ${p.ratio.toFixed(2)} Rₛ  ·  M = ${formatMass(blackHoleMassSolar)}`;
+
+  const note = $('horizonNote');
+  note.classList.toggle('show', p.ratio < 1.05);
+}
+
+function formatMass(m) {
+  if (m >= 1e6) return (m / 1e6).toFixed(1) + '×10⁶ M☉';
+  if (m >= 1000) return (m / 1000).toFixed(0) + '×10³ M☉';
+  return m + ' M☉';
+}
+
+// ═══════════════════════════════════════════════════════════
+// Main frame
+// ═══════════════════════════════════════════════════════════
+function frame() {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const t = sliderT;
+
+  if (autoplay) {
+    sliderT = Math.min(1, sliderT + dt * 0.045);
+    slider.value = String(Math.round(sliderT * 1000));
+    if (sliderT >= 1) autoplay = false;
+    $('btnPlay').classList.toggle('active', autoplay);
+    $('btnPlay').textContent = autoplay ? '⏸ Pause' : '▶ Auto descent';
+  }
+
+  const r = sliderToRadius(sliderT, blackHoleMassSolar);
+  const p = physicsAt(r, blackHoleMassSolar);
+  const def = deformationFromPhysics(p);
+
+  applyHuman(def, p, sliderT);
+  updateUI(p, def);
+
+  // Animate disk
+  diskGroup.rotation.y += dt * 0.25;
+  photonRing.rotation.z += dt * 0.4;
+
+  // Stream particles
+  const pos = stream.geometry.attributes.position.array;
+  const time = clock.elapsedTime;
+  for (let i = 0; i < streamCount; i++) {
+    const ph = (streamPhase[i] + time * 0.08) % 1;
+    const rad = BH_VISUAL_R * 1.3 + ph * BH_VISUAL_R * 2.8;
+    const ang = ph * Math.PI * 6 + i;
+    const y = Math.sin(ang * 2) * 0.15 * (1 - ph);
+    pos[i * 3] = Math.cos(ang) * rad * (1 - ph * 0.3);
+    pos[i * 3 + 1] = y;
+    pos[i * 3 + 2] = Math.sin(ang) * rad * (1 - ph * 0.3);
+  }
+  stream.geometry.attributes.position.needsUpdate = true;
+
+  // Bloom intensity rises near BH
+  bloom.strength = 0.45 + t * 0.55;
+
+  // Rim light heat
+  rim.intensity = 1.5 + t * 3;
+
+  composer.render();
+  requestAnimationFrame(frame);
+}
+
+// ═══════════════════════════════════════════════════════════
+// Events
+// ═══════════════════════════════════════════════════════════
+slider.addEventListener('input', () => {
+  sliderT = (+slider.value) / 1000;
+  autoplay = false;
+  $('btnPlay').classList.remove('active');
+  $('btnPlay').textContent = '▶ Auto descent';
+});
+
+$('btnPlay').addEventListener('click', () => {
+  autoplay = !autoplay;
+  if (sliderT >= 0.995) sliderT = 0;
+  $('btnPlay').classList.toggle('active', autoplay);
+  $('btnPlay').textContent = autoplay ? '⏸ Pause' : '▶ Auto descent';
+});
+
+$('btnReset').addEventListener('click', () => {
+  autoplay = false;
+  sliderT = 0;
+  slider.value = '0';
+  $('btnPlay').classList.remove('active');
+  $('btnPlay').textContent = '▶ Auto descent';
+});
+
+document.querySelectorAll('#massPills .pill').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#massPills .pill').forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    blackHoleMassSolar = parseFloat(btn.dataset.mass);
+    // Keep slider meaning; physics changes dramatically with mass
+  });
+});
+
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Space') {
+    e.preventDefault();
+    $('btnPlay').click();
+  } else if (e.code === 'ArrowRight') {
+    sliderT = Math.min(1, sliderT + 0.01);
+    slider.value = String(Math.round(sliderT * 1000));
+    autoplay = false;
+  } else if (e.code === 'ArrowLeft') {
+    sliderT = Math.max(0, sliderT - 0.01);
+    slider.value = String(Math.round(sliderT * 1000));
+    autoplay = false;
+  }
+});
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  composer.setSize(window.innerWidth, window.innerHeight);
+  bloom.setSize(window.innerWidth, window.innerHeight);
+});
+
+// Boot
+requestAnimationFrame(() => {
+  $('loader').classList.add('hide');
+  frame();
+});
+  </script>
+</body>
+</html>
