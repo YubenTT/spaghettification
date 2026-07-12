@@ -2,16 +2,21 @@
 
 Interactive single-page 3D visualization of **tidal forces** near a black hole — the process Neil deGrasse Tyson describes as stretching, spinal snap, bifurcation (`1 → 2 → 4 → 8…`), and extrusion “like toothpaste through a tube.”
 
-## Run
+## Live
+
+**https://yubentt.github.io/talat-lab/spaghettification/**
+
+Repo: [YubenTT/talat-lab](https://github.com/YubenTT/talat-lab)
+
+## Run locally
 
 ```bash
-cd spaghettification
+# from repo root
 python3 -m http.server 8765
+# http://localhost:8765/spaghettification/
 ```
 
-Open [http://localhost:8765](http://localhost:8765).
-
-> ES modules + import map require a local server (not `file://`).
+> ES modules + import map require a local (or Pages) server — not `file://`.
 
 ## Features
 
