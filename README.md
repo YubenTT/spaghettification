@@ -1,55 +1,62 @@
 # Spaghettification
 
-**Interactive 3D demo of tidal forces near a black hole.**
+Interactive 3D demo of **tidal forces** near a black hole.
 
-As you fall in, the gravity difference between your feet and head grows roughly as **1/r³** — stretch, structural snap, the 1→2→4→8 cascade, then the toothpaste-tube extrusion Neil deGrasse Tyson describes.
-
-**Live demo:** https://yubentt.github.io/spaghettification/
-
-![License: MIT](https://img.shields.io/badge/license-MIT-blue)
-![Static](https://img.shields.io/badge/stack-Three.js%20·%20static-black)
+**Live:** https://yubentt.github.io/spaghettification/
 
 ---
 
-## Why this exists
+## Idea
 
-Most black-hole visuals are pure spectacle. This one keeps a **live physics panel** next to the scene so the intuition is numerical:
+Your feet are closer to the hole than your head, so gravity is stronger at your feet. That difference (Δg) grows like **1/r³**.
 
-| You see | What it means |
-|---------|----------------|
-| `r`, `Rₛ`, `r/Rₛ` | How close you are vs the event horizon |
-| `g` at feet / head | Why feet feel heavier first |
-| Tidal `Δg` | The 1/r³ story in numbers |
-| Stretch load | Order-of-magnitude force on a 70 kg body |
-| Mass presets | **Why stellar holes kill you outside the horizon; Sgr A\* often doesn’t** |
+Drag the slider to fall in. Watch:
 
-Pedagogical **Newtonian** tides — intentionally not full GR — so the curve stays readable. Limits and credits: [`SOURCES.md`](./SOURCES.md).
+1. stretch  
+2. structural snap  
+3. 1 → 2 → 4 → 8  
+4. toothpaste-tube extrusion  
+
+**Mass matters.** A stellar hole (~10 M☉) can tear you apart *outside* the event horizon. Sgr A\* (~4×10⁶ M☉) often lets you cross while still roughly intact.
+
+Physics on the page is **Newtonian** (clear for teaching). Not full GR. Details: [`SOURCES.md`](./SOURCES.md).
 
 ---
 
-## Run locally
-
-Needs a tiny static server (ES modules + import map; `file://` will not work):
+## Run
 
 ```bash
 git clone https://github.com/YubenTT/spaghettification.git
 cd spaghettification
 python3 -m http.server 8765
-# open http://localhost:8765/
 ```
 
-Controls: drag the distance slider · `←` `→` fine step · `Space` auto-descent · mass pills (stellar / intermediate / Sgr A\*).
+Open http://localhost:8765/  
+Needs a local server (ES modules). `file://` will not work.
+
+---
+
+## Controls
+
+| Input | Action |
+|--------|--------|
+| Distance slider | Far → near |
+| Auto descent | Animated fall |
+| **0.5× / 1× / 1.5×** | Autoplay speed (default **0.5×**) |
+| Mass pills | 10 M☉ · 10³ M☉ · Sgr A\* |
+| `←` `→` | Fine step |
+| `Space` | Play / pause |
+
+White figure = **YOU** (feet toward the hole). Live numbers are in the right panel.
 
 ---
 
 ## Stack
 
-- Single `index.html` — no build step
-- [Three.js](https://threejs.org/) r170 + bloom postprocessing (CDN)
+- One static `index.html` (no build)
+- Three.js r170 + bloom (CDN)
 - GitHub Pages from `main`
-
----
 
 ## License
 
-[MIT](./LICENSE) — free to fork, teach with, or remix. Attribution appreciated, not required.
+[MIT](./LICENSE)
