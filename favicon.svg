@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Spaghettification">
+  <rect width="64" height="64" rx="14" fill="#05060c"/>
+  <circle cx="40" cy="32" r="14" fill="#000"/>
+  <circle cx="40" cy="32" r="15.5" fill="none" stroke="#ffe0a0" stroke-width="1.6" opacity="0.95"/>
+  <circle cx="40" cy="32" r="20" fill="none" stroke="#6eb6ff" stroke-width="1" opacity="0.35"/>
+  <ellipse cx="40" cy="32" rx="22" ry="6" fill="none" stroke="#ff6a30" stroke-width="1.4" opacity="0.55" transform="rotate(-18 40 32)"/>
+  <path d="M8 32c6-1 10-1 14 0" fill="none" stroke="#e8c4a8" stroke-width="2.2" stroke-linecap="round"/>
+  <path d="M10 29c5-.6 9-.4 12 .6M10 35c5 .6 9 .4 12-.6" fill="none" stroke="#ff5c7a" stroke-width="1.2" stroke-linecap="round" opacity="0.85"/>
+</svg>

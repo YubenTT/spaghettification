@@ -1,25 +1,55 @@
-# talat-lab
+# Spaghettification
 
-Small interactive experiments — physics, space, one-page demos.  
-Not product code. Each folder is self-contained and static when possible.
+**Interactive 3D demo of tidal forces near a black hole.**
 
-## Sketches
+As you fall in, the gravity difference between your feet and head grows roughly as **1/r³** — stretch, structural snap, the 1→2→4→8 cascade, then the toothpaste-tube extrusion Neil deGrasse Tyson describes.
 
-| Sketch | What | Demo |
-|--------|------|------|
-| [spaghettification](./spaghettification/) | Tidal forces near a black hole (Δg ∝ 1/r³) — NDT-inspired | [Open](https://yubentt.github.io/talat-lab/spaghettification/) |
+**Live demo:** https://yubentt.github.io/spaghettification/
 
-## Local
+![License: MIT](https://img.shields.io/badge/license-MIT-blue)
+![Static](https://img.shields.io/badge/stack-Three.js%20·%20static-black)
+
+---
+
+## Why this exists
+
+Most black-hole visuals are pure spectacle. This one keeps a **live physics panel** next to the scene so the intuition is numerical:
+
+| You see | What it means |
+|---------|----------------|
+| `r`, `Rₛ`, `r/Rₛ` | How close you are vs the event horizon |
+| `g` at feet / head | Why feet feel heavier first |
+| Tidal `Δg` | The 1/r³ story in numbers |
+| Stretch load | Order-of-magnitude force on a 70 kg body |
+| Mass presets | **Why stellar holes kill you outside the horizon; Sgr A\* often doesn’t** |
+
+Pedagogical **Newtonian** tides — intentionally not full GR — so the curve stays readable. Limits and credits: [`SOURCES.md`](./SOURCES.md).
+
+---
+
+## Run locally
+
+Needs a tiny static server (ES modules + import map; `file://` will not work):
 
 ```bash
-cd talat-lab
+git clone https://github.com/YubenTT/spaghettification.git
+cd spaghettification
 python3 -m http.server 8765
-# http://localhost:8765/spaghettification/
+# open http://localhost:8765/
 ```
 
-## Convention
+Controls: drag the distance slider · `←` `→` fine step · `Space` auto-descent · mass pills (stellar / intermediate / Sgr A\*).
 
-- One idea per folder
-- Prefer single `index.html` (or minimal static stack)
-- `README.md` = what + why + source credit
-- No CI/product scaffolding unless it graduates out of lab
+---
+
+## Stack
+
+- Single `index.html` — no build step
+- [Three.js](https://threejs.org/) r170 + bloom postprocessing (CDN)
+- GitHub Pages from `main`
+
+---
+
+## License
+
+[MIT](./LICENSE) — free to fork, teach with, or remix. Attribution appreciated, not required.
