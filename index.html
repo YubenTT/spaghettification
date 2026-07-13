@@ -603,8 +603,8 @@ const G_EARTH = 9.80665;
 
 // Visual layout (scene units ≠ meters; meters drive math)
 const BH_VISUAL_R = 2.4;
-const HUMAN_BASE_SCALE = 1.05; // large enough to read as a person at safe distance
-const HUMAN_X = -6.4;
+const HUMAN_BASE_SCALE = 1.12;
+const HUMAN_X = -6.2;
 
 // Autoplay rates (slider units per second). Default is deliberately slow.
 const SPEED_RATES = { '0.5': 0.014, '1': 0.026, '1.5': 0.042 };
@@ -706,12 +706,12 @@ function deformationFromPhysics(p) {
   const multiT = sm(F_MULTI * 0.45, F_MULTI * 2.2, F);
   const tubeT = sm(F_TUBE * 0.35, F_TUBE * 3.5, F);
 
-  // Visual length: anchored to log10(Δg / g⊕), exaggerated for readability
-  const stretchBase = 1 + Math.log10(1 + deltaG / G_EARTH) * 0.72;
-  const stretch = Math.min(22, stretchBase * (1 + severe * 0.9 + snapT * 1.35 + tubeT * 2.8));
+  // Visual length — enough to read as rubber-man, not an infinite noodle
+  const stretchBase = 1 + Math.log10(1 + deltaG / G_EARTH) * 0.38;
+  const stretch = Math.min(6.5, stretchBase * (1 + severe * 0.55 + snapT * 0.45 + tubeT * 0.9));
 
-  // Lateral compression (toothpaste through a tube)
-  const squash = Math.max(0.035, 1 - tubeT * 0.94 - multiT * 0.18 - severe * 0.08);
+  // Lateral compression (toothpaste) — stay human-thick until deep tube
+  const squash = Math.max(0.28, 1 - tubeT * 0.55 - multiT * 0.12 - severe * 0.06);
 
   let bifurcate = 0;
   if (snapT > 0.5) bifurcate = 1;
@@ -897,68 +897,56 @@ const streamMat = new THREE.PointsMaterial({
 const stream = new THREE.Points(streamGeo, streamMat);
 bhGroup.add(stream);
 
-// ── Human figure (high-contrast silhouette; feet → black hole) ──
+// ── YOU: Mr. Fantastic–style stretchable human (blue suit) ──
+// Built upright (Y-up, face +Z), then laid feet→BH (+X); face stays +Z toward camera.
 const humanRoot = new THREE.Group();
 humanRoot.position.set(HUMAN_X, 0, 0);
 scene.add(humanRoot);
 
-// Key light locked to the figure so YOU stays readable against the starfield
-const youLight = new THREE.PointLight(0xffffff, 2.4, 18, 2);
-youLight.position.set(0, 0.4, 3.2);
+const youLight = new THREE.PointLight(0xffffff, 2.8, 20, 2);
+youLight.position.set(0.2, 0.6, 3.6);
 humanRoot.add(youLight);
-const youFill = new THREE.PointLight(0x88bbff, 1.1, 14, 2);
-youFill.position.set(-1.5, 0.2, -2.2);
+const youFill = new THREE.PointLight(0x6a9fff, 1.2, 16, 2);
+youFill.position.set(-1.2, 0.3, -2.4);
 humanRoot.add(youFill);
 
-// High-contrast suit + skin (must pop on dark space)
+// Classic FF blue suit + skin + black gloves/boots
 const skinMat = new THREE.MeshStandardMaterial({
-  color: 0xffd2b0,
-  roughness: 0.42,
+  color: 0xf0c4a0,
+  roughness: 0.48,
   metalness: 0.02,
-  emissive: 0x3a2010,
-  emissiveIntensity: 0.22,
+  emissive: 0x2a1810,
+  emissiveIntensity: 0.18,
 });
 const suitMat = new THREE.MeshStandardMaterial({
-  color: 0xf2f6ff,
-  roughness: 0.38,
-  metalness: 0.12,
-  emissive: 0x1a2a44,
-  emissiveIntensity: 0.28,
+  color: 0x1a5fd4,
+  roughness: 0.42,
+  metalness: 0.08,
+  emissive: 0x0a2255,
+  emissiveIntensity: 0.35,
 });
-const accentMat = new THREE.MeshStandardMaterial({
-  color: 0x5ec8ff,
-  roughness: 0.35,
-  metalness: 0.25,
-  emissive: 0x0a3a66,
-  emissiveIntensity: 0.45,
+const gloveMat = new THREE.MeshStandardMaterial({
+  color: 0x141820,
+  roughness: 0.55,
+  metalness: 0.15,
+  emissive: 0x05060a,
+  emissiveIntensity: 0.12,
 });
 const hairMat = new THREE.MeshStandardMaterial({
-  color: 0x1c1822,
-  roughness: 0.8,
-  metalness: 0.05,
-  emissive: 0x08060c,
-  emissiveIntensity: 0.1,
+  color: 0x2a2218,
+  roughness: 0.85,
+  metalness: 0.02,
+  emissive: 0x0a0806,
+  emissiveIntensity: 0.08,
 });
+const eyeWhiteMat = new THREE.MeshBasicMaterial({ color: 0xf5f7fa });
+const eyeIrisMat = new THREE.MeshBasicMaterial({ color: 0x1a2840 });
+const mouthMat = new THREE.MeshBasicMaterial({ color: 0x8a4050 });
 
 const humanBody = new THREE.Group();
 humanRoot.add(humanBody);
 
-// Soft halo behind YOU (subtle; labels do the heavy lifting)
-const youHalo = new THREE.Mesh(
-  new THREE.SphereGeometry(1.15, 32, 32),
-  new THREE.MeshBasicMaterial({
-    color: 0x6eb6ff,
-    transparent: true,
-    opacity: 0.06,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
-    side: THREE.BackSide,
-  })
-);
-humanRoot.add(youHalo);
-
 const parts = {};
-
 function addPart(name, mesh, x, y, z) {
   mesh.position.set(x, y, z);
   mesh.userData.base = { x, y, z };
@@ -967,55 +955,94 @@ function addPart(name, mesh, x, y, z) {
   return mesh;
 }
 
-// Build upright (Y-up), then rotate so feet point at BH (+X)
-const U = 1.0;
+// Head — large readable face (Mr. Fantastic vibe)
 addPart('head', (() => {
   const g = new THREE.Group();
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.24 * U, 28, 28), skinMat);
+  const skull = new THREE.Mesh(new THREE.SphereGeometry(0.26, 32, 32), skinMat);
   const hair = new THREE.Mesh(
-    new THREE.SphereGeometry(0.25 * U, 22, 18, 0, Math.PI * 2, 0, Math.PI * 0.55),
+    new THREE.SphereGeometry(0.27, 24, 20, 0, Math.PI * 2, 0, Math.PI * 0.52),
     hairMat
   );
-  hair.position.y = 0.05;
-  // Visor stripe so “face / head” is obvious after rotation
-  const visor = new THREE.Mesh(
-    new THREE.BoxGeometry(0.28, 0.1, 0.08),
-    accentMat
-  );
-  visor.position.set(0, 0.02, 0.2);
-  // Eyes (dark) on face side
-  const eyeM = new THREE.MeshBasicMaterial({ color: 0x0c1018 });
-  const e1 = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 10), eyeM);
-  const e2 = e1.clone();
-  e1.position.set(0.08, 0.04, 0.2);
-  e2.position.set(-0.08, 0.04, 0.2);
-  g.add(head, hair, visor, e1, e2);
+  hair.position.set(0, 0.06, -0.02);
+  const brow = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.04, 0.06), skinMat);
+  brow.position.set(0, 0.08, 0.2);
+  const ew = new THREE.Mesh(new THREE.SphereGeometry(0.045, 12, 12), eyeWhiteMat);
+  const ew2 = ew.clone();
+  ew.position.set(0.075, 0.04, 0.22);
+  ew2.position.set(-0.075, 0.04, 0.22);
+  const iris = new THREE.Mesh(new THREE.SphereGeometry(0.025, 10, 10), eyeIrisMat);
+  const iris2 = iris.clone();
+  iris.position.set(0.075, 0.04, 0.255);
+  iris2.position.set(-0.075, 0.04, 0.255);
+  const nose = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 10), skinMat);
+  nose.position.set(0, -0.02, 0.24);
+  nose.scale.set(0.7, 0.9, 1.1);
+  const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.025, 0.03), mouthMat);
+  mouth.position.set(0, -0.1, 0.22);
+  const earL = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 10), skinMat);
+  const earR = earL.clone();
+  earL.position.set(0.25, 0.02, 0);
+  earR.position.set(-0.25, 0.02, 0);
+  g.add(skull, hair, brow, ew, ew2, iris, iris2, nose, mouth, earL, earR);
   return g;
-})(), 0, 1.58, 0);
+})(), 0, 1.62, 0);
 
-addPart('neck', new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.09, 0.14, 14), skinMat), 0, 1.38, 0);
-addPart('torso', new THREE.Mesh(new THREE.CapsuleGeometry(0.32, 0.58, 10, 18), suitMat), 0, 1.0, 0);
-// Chest band (reads as torso, not a cockpit)
-addPart('chest', new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.12, 0.1), accentMat), 0, 1.12, 0.28);
-addPart('pelvis', new THREE.Mesh(new THREE.CapsuleGeometry(0.26, 0.14, 8, 16), suitMat), 0, 0.56, 0);
+addPart('neck', new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.1, 0.16, 16), skinMat), 0, 1.4, 0);
+addPart('torso', new THREE.Mesh(new THREE.CapsuleGeometry(0.3, 0.52, 12, 20), suitMat), 0, 1.02, 0);
+addPart('waist', new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.28, 0.16, 16), suitMat), 0, 0.68, 0);
+addPart('pelvis', new THREE.Mesh(new THREE.CapsuleGeometry(0.25, 0.1, 8, 16), suitMat), 0, 0.52, 0);
 
-// Arms slightly out for a clear human T-pose-ish silhouette
-addPart('uArmL', new THREE.Mesh(new THREE.CapsuleGeometry(0.08, 0.3, 8, 12), suitMat), 0.44, 1.18, 0);
-addPart('uArmR', new THREE.Mesh(new THREE.CapsuleGeometry(0.08, 0.3, 8, 12), suitMat), -0.44, 1.18, 0);
-addPart('lArmL', new THREE.Mesh(new THREE.CapsuleGeometry(0.07, 0.3, 8, 12), skinMat), 0.52, 0.78, 0);
-addPart('lArmR', new THREE.Mesh(new THREE.CapsuleGeometry(0.07, 0.3, 8, 12), skinMat), -0.52, 0.78, 0);
-addPart('handL', new THREE.Mesh(new THREE.SphereGeometry(0.07, 12, 12), skinMat), 0.54, 0.55, 0);
-addPart('handR', new THREE.Mesh(new THREE.SphereGeometry(0.07, 12, 12), skinMat), -0.54, 0.55, 0);
+function makeArm(side) {
+  const g = new THREE.Group();
+  const u = new THREE.Mesh(new THREE.CapsuleGeometry(0.075, 0.28, 8, 14), suitMat);
+  u.position.y = -0.18;
+  const l = new THREE.Mesh(new THREE.CapsuleGeometry(0.065, 0.28, 8, 14), suitMat);
+  l.position.y = -0.52;
+  const hand = new THREE.Mesh(new THREE.SphereGeometry(0.085, 14, 14), gloveMat);
+  hand.position.y = -0.78;
+  const palm = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.06, 0.12), gloveMat);
+  palm.position.set(0, -0.88, 0.02);
+  g.add(u, l, hand, palm);
+  g.rotation.z = side * 0.28;
+  g.rotation.x = -0.2;
+  return g;
+}
+addPart('armL', makeArm(1), 0.36, 1.28, 0.08);
+addPart('armR', makeArm(-1), -0.36, 1.28, 0.08);
 
-// Legs
-addPart('uLegL', new THREE.Mesh(new THREE.CapsuleGeometry(0.1, 0.4, 8, 14), suitMat), 0.14, 0.26, 0);
-addPart('uLegR', new THREE.Mesh(new THREE.CapsuleGeometry(0.1, 0.4, 8, 14), suitMat), -0.14, 0.26, 0);
-addPart('lLegL', new THREE.Mesh(new THREE.CapsuleGeometry(0.085, 0.4, 8, 14), suitMat), 0.14, -0.26, 0);
-addPart('lLegR', new THREE.Mesh(new THREE.CapsuleGeometry(0.085, 0.4, 8, 14), suitMat), -0.14, -0.26, 0);
-addPart('footL', new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.08, 0.22), accentMat), 0.14, -0.52, 0.05);
-addPart('footR', new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.08, 0.22), accentMat), -0.14, -0.52, 0.05);
+function makeLeg(side) {
+  const g = new THREE.Group();
+  const u = new THREE.Mesh(new THREE.CapsuleGeometry(0.095, 0.36, 8, 14), suitMat);
+  u.position.y = -0.22;
+  const l = new THREE.Mesh(new THREE.CapsuleGeometry(0.08, 0.36, 8, 14), suitMat);
+  l.position.y = -0.62;
+  const foot = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.08, 0.24), gloveMat);
+  foot.position.set(0, -0.9, 0.06);
+  g.add(u, l, foot);
+  g.rotation.z = side * 0.06;
+  return g;
+}
+addPart('legL', makeLeg(1), 0.13, 0.42, 0);
+addPart('legR', makeLeg(-1), -0.13, 0.42, 0);
 
-// Fragment groups for bifurcation
+// Rubber-body stretch ribbons (visible only when stretching — Mr. Fantastic vibe)
+const stretchRibbons = new THREE.Group();
+humanBody.add(stretchRibbons);
+const ribbonMat = new THREE.MeshStandardMaterial({
+  color: 0x1a5fd4,
+  roughness: 0.4,
+  metalness: 0.1,
+  emissive: 0x0a2255,
+  emissiveIntensity: 0.4,
+  transparent: true,
+  opacity: 0,
+});
+for (let i = 0; i < 4; i++) {
+  const rib = new THREE.Mesh(new THREE.CapsuleGeometry(0.04, 0.5, 6, 10), ribbonMat.clone());
+  rib.visible = false;
+  stretchRibbons.add(rib);
+}
+
 const fragmentGroup = new THREE.Group();
 humanRoot.add(fragmentGroup);
 fragmentGroup.visible = false;
@@ -1030,23 +1057,27 @@ function cloneBodyAsFragments(level) {
   }
   const n = Math.min(16, Math.pow(2, level));
   const mats = [
-    new THREE.MeshStandardMaterial({ color: 0xffd2b0, roughness: 0.4, metalness: 0.05, emissive: 0x551010, emissiveIntensity: 0.35 }),
-    new THREE.MeshStandardMaterial({ color: 0xf2f6ff, roughness: 0.4, metalness: 0.1, emissive: 0x221018, emissiveIntensity: 0.25 }),
-    new THREE.MeshStandardMaterial({ color: 0xff6a7a, roughness: 0.45, metalness: 0.05, emissive: 0x660010, emissiveIntensity: 0.4 }),
+    suitMat.clone(),
+    skinMat.clone(),
+    gloveMat.clone(),
+    new THREE.MeshStandardMaterial({ color: 0xc45a5a, roughness: 0.5, metalness: 0.05, emissive: 0x400808, emissiveIntensity: 0.3 }),
   ];
   for (let i = 0; i < n; i++) {
-    const frag = new THREE.Mesh(
-      new THREE.CapsuleGeometry(0.14 + Math.random() * 0.1, 0.45 + Math.random() * 0.55, 8, 12),
-      mats[i % mats.length]
-    );
+    const isHeadish = i === 0 && n <= 4;
+    const frag = isHeadish
+      ? new THREE.Mesh(new THREE.SphereGeometry(0.24, 18, 18), skinMat.clone())
+      : new THREE.Mesh(
+          new THREE.CapsuleGeometry(0.11 + (i % 3) * 0.025, 0.4 + (i % 4) * 0.1, 8, 12),
+          mats[i % mats.length]
+        );
     frag.userData.idx = i;
-    frag.userData.n = n;
     fragmentGroup.add(frag);
   }
 }
 
-// Feet toward BH (+X), head away (−X)
-humanBody.rotation.z = -Math.PI / 2;
+// Feet → BH (+X), head ← (−X), face +Z toward camera
+// rot.z = +90°: local +Y (head) → −X, local −Y (feet) → +X
+humanBody.rotation.z = Math.PI / 2;
 humanBody.scale.setScalar(HUMAN_BASE_SCALE);
 
 // Descent path guide
@@ -1265,122 +1296,159 @@ function applyHuman(def, p, t, dt) {
     0
   );
 
-  const sLong = visStretch;
-  const sLat = visSquash;
+  // Mr. Fantastic stretch: length along body (local Y → world X), keep thickness readable
+  const sLong = 1 + (visStretch - 1) * 0.85; // cap visual exaggeration a bit
+  const sLat = Math.max(0.42, 1 - (1 - visSquash) * 0.55); // never wire-thin until tube
   const time = clock.elapsedTime;
-
-  // Halo pulse + scale with body
-  youHalo.scale.setScalar(0.95 + sLong * 0.08 + Math.sin(time * 1.4) * 0.03);
-  youHalo.material.opacity = 0.07 + def.notice * 0.06 + def.severe * 0.08;
 
   if (bifurcate >= 1 && snapT > 0.55) {
     humanBody.visible = false;
     fragmentGroup.visible = true;
-    youHalo.visible = false;
     if (bifurcate !== lastBifurcate) {
       cloneBodyAsFragments(Math.min(4, bifurcate));
       lastBifurcate = bifurcate;
     }
     const n = fragmentGroup.children.length;
-    // Keep fragments readable: limited lateral squash, clear axial spread
-    const spread = 0.55 + Math.min(4.5, sLong * 0.35) + tubeT * 0.9;
+    const spread = 0.7 + Math.min(3.8, sLong * 0.4) + tubeT * 0.8;
     fragmentGroup.children.forEach((frag, i) => {
       const u = n === 1 ? 0.5 : i / (n - 1);
-      const along = (u - 0.5) * spread * 2.4;
-      frag.position.x = along;
-      frag.position.y = Math.sin(i * 1.7 + time * 1.4) * 0.14 * (1 + tubeT * 0.5);
-      frag.position.z = Math.cos(i * 2.1 + time * 1.1) * 0.1;
-      const long = 0.9 + Math.min(2.2, sLong * 0.12) + tubeT * 0.5;
-      const lat = Math.max(0.35, 0.85 - tubeT * 0.35);
+      frag.position.x = (u - 0.5) * spread * 2.6;
+      frag.position.y = Math.sin(i * 1.9 + time * 1.2) * 0.16;
+      frag.position.z = Math.cos(i * 1.4 + time * 0.9) * 0.12;
+      const long = 1.0 + Math.min(1.8, sLong * 0.15) + tubeT * 0.4;
+      const lat = Math.max(0.45, 0.9 - tubeT * 0.3);
       frag.scale.set(lat, long, lat);
       frag.rotation.z = Math.PI / 2;
-      frag.rotation.y = i * 0.2 + time * 0.08;
+      frag.rotation.y = i * 0.15;
     });
   } else {
     humanBody.visible = true;
     fragmentGroup.visible = false;
-    youHalo.visible = true;
     lastBifurcate = -1;
 
-    // Body: Y = stretch axis before rotation → world X toward BH after rot.z
+    // Whole-body scale: local Y is head↔feet axis after rot.z = +90°
+    // Counter-scale head so face stays human-sized (classic rubber-man)
     humanBody.scale.set(
       HUMAN_BASE_SCALE * sLat,
       HUMAN_BASE_SCALE * sLong,
       HUMAN_BASE_SCALE * sLat
     );
 
-    const limbPull = 1 + (sLong - 1) * 0.4;
-    ['uLegL', 'uLegR', 'lLegL', 'lLegR'].forEach((k) => {
-      if (!parts[k]) return;
-      parts[k].scale.y = limbPull;
-    });
-    ['uArmL', 'uArmR', 'lArmL', 'lArmR'].forEach((k) => {
-      if (!parts[k]) return;
-      parts[k].scale.y = 1 + (sLong - 1) * 0.22;
-      parts[k].scale.x = sLat;
-      parts[k].scale.z = sLat;
-    });
+    // Head: undo most of the squash/stretch so it stays a face
+    const headFixY = 1 / Math.pow(sLong, 0.85);
+    const headFixLat = 1 / Math.pow(sLat, 0.7);
     if (parts.head) {
-      parts.head.scale.set(sLat, Math.min(1.25, 1 + (sLong - 1) * 0.06), sLat);
+      parts.head.scale.set(headFixLat, headFixY, headFixLat);
+      // Keep head near the top of the elongated body (local +Y)
+      parts.head.position.y = parts.head.userData.base.y;
     }
-    if (parts.torso) {
-      parts.torso.scale.set(sLat, 1 + (sLong - 1) * 0.12, sLat);
-    }
-    if (parts.chest) {
-      parts.chest.scale.set(sLat, 1 + (sLong - 1) * 0.1, 1);
+    if (parts.neck) {
+      parts.neck.scale.set(headFixLat * 0.9, headFixY * 0.85, headFixLat * 0.9);
+      parts.neck.position.y = parts.neck.userData.base.y;
     }
 
-    // Stress tint (skin + suit)
+    // Arms: stretch like rubber, reach slightly toward BH as tension rises
+    const armPull = 1 + (sLong - 1) * 0.55;
+    const armOut = 0.28 + def.severe * 0.25;
+    ['armL', 'armR'].forEach((k, idx) => {
+      const side = k === 'armL' ? 1 : -1;
+      if (!parts[k]) return;
+      parts[k].scale.set(1, armPull, 1);
+      parts[k].rotation.z = side * armOut;
+      parts[k].rotation.x = -0.2 - def.notice * 0.35;
+      // Mild reach along body toward feet (local −Y) as stretch grows
+      parts[k].position.y = parts[k].userData.base.y - (sLong - 1) * 0.08;
+    });
+
+    // Legs: elongate toward BH
+    const legPull = 1 + (sLong - 1) * 0.65;
+    ['legL', 'legR'].forEach((k) => {
+      if (!parts[k]) return;
+      parts[k].scale.set(1, legPull, 1);
+    });
+
+    // Torso thins a little when extruded (toothpaste) but stays blue suit
+    if (parts.torso) {
+      parts.torso.scale.set(
+        Math.max(0.55, sLat),
+        1 + (sLong - 1) * 0.08,
+        Math.max(0.55, sLat)
+      );
+    }
+
+    // Rubber ribbons between torso segments when stretching hard
+    const showRib = def.severe > 0.15 && snapT < 0.5;
+    stretchRibbons.children.forEach((rib, i) => {
+      rib.visible = showRib;
+      if (!showRib) return;
+      const u = (i + 0.5) / stretchRibbons.children.length;
+      rib.position.set(
+        (i - 1.5) * 0.08,
+        0.9 - u * 0.7,
+        0.2 + Math.sin(time * 2 + i) * 0.03
+      );
+      rib.scale.set(
+        Math.max(0.4, sLat),
+        0.6 + (sLong - 1) * 0.35,
+        Math.max(0.4, sLat)
+      );
+      rib.material.opacity = Math.min(0.85, def.severe * 0.7);
+    });
+
+    // Stress: blue suit stays blue; skin flushes; suit emissive rises
     const stress = Math.min(1, def.severe * 0.55 + snapT);
-    skinMat.color.setRGB(1.0 - stress * 0.15, 0.82 - stress * 0.45, 0.69 - stress * 0.4);
-    skinMat.emissiveIntensity = 0.22 + stress * 0.35;
-    suitMat.emissiveIntensity = 0.28 + stress * 0.2;
-    suitMat.color.setRGB(0.95 - stress * 0.25, 0.96 - stress * 0.35, 1.0 - stress * 0.15);
-    accentMat.emissiveIntensity = 0.45 + stress * 0.35;
+    skinMat.color.setRGB(0.94 - stress * 0.12, 0.77 - stress * 0.35, 0.63 - stress * 0.3);
+    skinMat.emissiveIntensity = 0.18 + stress * 0.35;
+    suitMat.emissiveIntensity = 0.35 + stress * 0.4;
+    // Keep suit blue (don't wash to white)
+    suitMat.color.setRGB(
+      0.1 + stress * 0.15,
+      0.37 - stress * 0.08,
+      0.83 - stress * 0.1
+    );
   }
 
-  // Force arrows — feet (red) stronger pull toward BH
-  const gScale = (g) => Math.min(3.8, 0.2 + Math.log10(1 + g / G_EARTH) * 0.42);
-  const lenF = Math.max(0.35, gScale(p.gFeet));
-  const lenH = Math.max(0.25, gScale(p.gHead) * 0.92);
-  const halfLen = sLong * HUMAN_BASE_SCALE * 0.95;
+  // Force arrows + tags — keep near body, not into left UI
+  const gScale = (g) => Math.min(2.8, 0.18 + Math.log10(1 + g / G_EARTH) * 0.36);
+  const lenF = Math.max(0.3, gScale(p.gFeet));
+  const lenH = Math.max(0.22, gScale(p.gHead) * 0.9);
+  const halfLen = sLong * HUMAN_BASE_SCALE * 0.92;
 
-  // Always visible, but grow with tidal load
-  const showForces = 0.25 + def.notice * 0.75;
-  arrowFeet.position.set(halfLen * 0.92, 0.2, 0.55);
-  arrowHead.position.set(-halfLen * 0.92, 0.2, 0.55);
+  const showForces = def.notice > 0.08 ? 0.35 + def.notice * 0.65 : 0.2;
+  arrowFeet.position.set(halfLen * 0.88, 0.35, 0.7);
+  arrowHead.position.set(-halfLen * 0.88, 0.35, 0.7);
   arrowFeet.rotation.z = -Math.PI / 2;
   arrowHead.rotation.z = -Math.PI / 2;
-  arrowFeet.scale.set(showForces, lenF * (0.55 + def.notice * 0.55), showForces);
-  arrowHead.scale.set(showForces, lenH * (0.55 + def.notice * 0.55), showForces);
+  arrowFeet.scale.set(showForces, lenF * (0.5 + def.notice * 0.5), showForces);
+  arrowHead.scale.set(showForces, lenH * (0.5 + def.notice * 0.5), showForces);
 
-  feetTag.position.set(halfLen * 0.95, -0.55 - lenF * 0.08, 0.7);
-  headTag.position.set(-halfLen * 0.95, 0.65 + lenH * 0.06, 0.7);
-  if (def.notice > 0.2) {
-    feetTag.userData.setText('FEET  ' + fmtG(p.gFeet));
-    headTag.userData.setText('HEAD  ' + fmtG(p.gHead));
+  // Tags sit just outside head/feet on the body axis (world X), above figure (Y)
+  feetTag.position.set(halfLen * 0.75, -1.05, 0.9);
+  headTag.position.set(-halfLen * 0.75, -1.05, 0.9);
+  if (def.notice > 0.25) {
+    feetTag.userData.setText('FEET');
+    headTag.userData.setText('HEAD');
   } else {
-    feetTag.userData.setText('FEET → BH');
+    feetTag.userData.setText('FEET →');
     headTag.userData.setText('HEAD');
   }
+  // Hide long g numbers on tags (they clutter); panel has the numbers
+  feetTag.scale.set(1.35, 0.4, 1);
+  headTag.scale.set(1.25, 0.4, 1);
 
-  const beamLen = Math.max(0.35, halfLen * 1.7);
+  const beamLen = Math.max(0.4, halfLen * 1.65);
   tensionBeam.scale.set(1, beamLen, 1);
-  tensionBeam.position.set(0, 0.12, 0.28);
+  tensionBeam.position.set(0, 0.2, 0.35);
   tensionBeam.rotation.z = -Math.PI / 2;
-  tensionMat.opacity = Math.min(0.6, def.notice * 0.2 + def.severe * 0.4 + snapT * 0.25);
+  tensionMat.opacity = Math.min(0.55, def.notice * 0.15 + def.severe * 0.35 + snapT * 0.2);
 
-  // YOU label rides above the body in screen-friendly space
-  humanLabel.position.set(0, 1.15 + Math.min(1.4, sLong * 0.12), 0.85);
+  // YOU badge above torso (screen-up = world Y)
+  humanLabel.position.set(0, 1.35, 1.0);
   humanLabel.userData.setText(stage >= 3 ? 'FRAGMENTS' : 'YOU');
-  humanLabel.scale.set(
-    stage >= 3 ? 2.1 : 1.7,
-    stage >= 3 ? 0.55 : 0.55,
-    1
-  );
+  humanLabel.scale.set(stage >= 3 ? 1.9 : 1.55, 0.48, 1);
 
-  toBhLabel.visible = stage < 2;
-  toBhLabel.position.set(0.6 + t * 0.3, -1.45, 0.4);
+  toBhLabel.visible = stage < 2 && t < 0.35;
+  toBhLabel.position.set(0.4, -1.55, 0.5);
 }
 
 // ═══════════════════════════════════════════════════════════
